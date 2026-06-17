@@ -3,13 +3,16 @@
 #include <random>
 #include <chrono>
 #include <iomanip>
+#include <thread>
 
 #include "merge_sort.h"
 #include "parallel_merge_sort.h"
 
 using namespace std;
 
-// Generate random array
+// --------------------------------------------------
+// Generate Random Dataset
+// --------------------------------------------------
 vector<int> generateRandomArray(int size)
 {
     vector<int> arr(size);
@@ -27,10 +30,10 @@ vector<int> generateRandomArray(int size)
     return arr;
 }
 
-// Verify both arrays are identical
-bool arraysEqual(
-    const vector<int> &a,
-    const vector<int> &b)
+// --------------------------------------------------
+// Verify both sorted arrays are identical
+// --------------------------------------------------
+bool arraysEqual(const vector<int> &a, const vector<int> &b)
 {
     if (a.size() != b.size())
         return false;
@@ -44,8 +47,26 @@ bool arraysEqual(
     return true;
 }
 
+// --------------------------------------------------
+// Main Program
+// --------------------------------------------------
 int main()
 {
+    // Detect available CPU cores
+    unsigned int cores = thread::hardware_concurrency();
+
+    if (cores == 0)
+        cores = 4; // fallback value
+
+    cout << "\n==============================================================\n";
+    cout << " Parallel Sorting System Using Multithreading in C++\n";
+    cout << "==============================================================\n\n";
+
+    cout << "Available CPU Cores: "
+         << cores
+         << "\n\n";
+
+    // Dataset sizes used for benchmarking
     vector<int> testSizes =
         {
             10000,
@@ -54,32 +75,51 @@ int main()
             500000,
             1000000};
 
-    cout << "\n==============================================================\n";
-    cout << " Parallel Sorting System Using Multithreading in C++\n";
-    cout << "==============================================================\n\n";
+    // Select thread depth according to CPU capability
+    int depth;
 
+    if (cores >= 8)
+        depth = 3;
+    else if (cores >= 4)
+        depth = 2;
+    else
+        depth = 1;
+
+    cout << "Parallel Thread Depth: "
+         << depth
+         << "\n\n";
+
+    // Table Header
     cout << left
          << setw(15) << "Dataset"
-         << setw(20) << "Sequential(us)"
-         << setw(20) << "Parallel(us)"
-         << setw(15) << "Speedup"
-         << setw(15) << "Validation"
+         << setw(18) << "Sequential(us)"
+         << setw(18) << "Parallel(us)"
+         << setw(12) << "Speedup"
+         << setw(12) << "Efficiency"
+         << setw(12) << "Validation"
          << endl;
 
-    cout << string(85, '-') << endl;
+    cout << string(87, '-') << endl;
 
+    // ==================================================
+    // Benchmark Loop
+    // ==================================================
     for (int size : testSizes)
     {
-        // Generate dataset
-        vector<int> originalArray = generateRandomArray(size);
+        // Generate random dataset
+        vector<int> originalArray =
+            generateRandomArray(size);
 
-        // Create copies for fair comparison
-        vector<int> sequentialArray = originalArray;
-        vector<int> parallelArray = originalArray;
+        // Create identical copies
+        vector<int> sequentialArray =
+            originalArray;
 
-        // ==========================
-        // Sequential Benchmark
-        // ==========================
+        vector<int> parallelArray =
+            originalArray;
+
+        // =====================================
+        // Sequential Merge Sort
+        // =====================================
 
         auto startSeq =
             chrono::high_resolution_clock::now();
@@ -97,9 +137,9 @@ int main()
                 chrono::microseconds>(
                 endSeq - startSeq);
 
-        // ==========================
-        // Parallel Benchmark
-        // ==========================
+        // =====================================
+        // Parallel Merge Sort
+        // =====================================
 
         auto startPar =
             chrono::high_resolution_clock::now();
@@ -108,7 +148,7 @@ int main()
             parallelArray,
             0,
             parallelArray.size() - 1,
-            3);
+            depth);
 
         auto endPar =
             chrono::high_resolution_clock::now();
@@ -118,39 +158,49 @@ int main()
                 chrono::microseconds>(
                 endPar - startPar);
 
-        // ==========================
-        // Validation
-        // ==========================
+        // =====================================
+        // Validate Correctness
+        // =====================================
 
         bool correct =
             arraysEqual(
                 sequentialArray,
                 parallelArray);
 
-        // ==========================
-        // Speedup Calculation
-        // ==========================
+        // =====================================
+        // Performance Metrics
+        // =====================================
 
-        double speedup =
-            static_cast<double>(seqDuration.count()) /
-            parDuration.count();
+        double speedup = 0.0;
 
-        // ==========================
-        // Print Results
-        // ==========================
+        if (parDuration.count() > 0)
+        {
+            speedup =
+                static_cast<double>(
+                    seqDuration.count()) /
+                parDuration.count();
+        }
+
+        double efficiency =
+            speedup / cores;
+
+        // =====================================
+        // Print Result Row
+        // =====================================
 
         cout << left
              << setw(15) << size
-             << setw(20) << seqDuration.count()
-             << setw(20) << parDuration.count()
-             << setw(15) << fixed << setprecision(2)
+             << setw(18) << seqDuration.count()
+             << setw(18) << parDuration.count()
+             << setw(12) << fixed << setprecision(2)
              << speedup
-             << setw(15)
+             << setw(12) << efficiency
+             << setw(12)
              << (correct ? "PASS" : "FAIL")
              << endl;
     }
 
-    cout << "\nBenchmark Complete.\n";
+    cout << "\nBenchmark Completed Successfully.\n";
 
     return 0;
 }
